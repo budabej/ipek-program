@@ -34,7 +34,7 @@
     font-family: 'Nunito', -apple-system, BlinkMacSystemFont, sans-serif;
     background: var(--bg);
     color: var(--ink);
-    padding-bottom: 90px;
+    padding-bottom: 95px;
   }
   .wrap { max-width: 760px; margin: 0 auto; padding: 18px 18px 40px; }
 
@@ -50,28 +50,35 @@
 
   .ust-senkron-btn {
     background: #fff; color: var(--ink); border: 2px solid var(--line);
-    padding: 10px 16px; border-radius: 16px; font-family: inherit;
-    font-weight: 800; font-size: 14px; cursor: pointer;
+    padding: 12px 18px; border-radius: 16px; font-family: inherit;
+    font-weight: 900; font-size: 15px; cursor: pointer;
     display: flex; align-items: center; gap: 6px;
-    box-shadow: 0 3px 10px rgba(0,0,0,0.05);
+    box-shadow: 0 3px 10px rgba(0,0,0,0.06);
   }
   .ust-senkron-btn.degisti {
     background: var(--green); color: #fff; border-color: var(--green);
-    box-shadow: 0 4px 14px rgba(43, 182, 115, 0.35);
+    box-shadow: 0 4px 14px rgba(43, 182, 115, 0.4);
   }
   .ust-senkron-btn:disabled { opacity: 0.6; cursor: wait; }
+
+  .bildirim-serit {
+    margin-top: 12px; padding: 12px 16px; border-radius: 14px;
+    font-weight: 800; font-size: 15px; text-align: center; display: none;
+  }
+  .bildirim-serit.ok { display: block; background: #D8F5E8; color: #166649; border: 2px solid #2BB673; }
+  .bildirim-serit.err { display: block; background: #FFE0E0; color: #8A1F1F; border: 2px solid #E05A5A; }
 
   .kaydet-cubuk {
     position: fixed; bottom: 16px; left: 50%; transform: translateX(-50%);
     width: calc(100% - 32px); max-width: 720px; z-index: 999;
-    background: #1F4E8C; color: #fff; padding: 12px 16px;
+    background: #1F4E8C; color: #fff; padding: 14px 18px;
     border-radius: 20px; display: flex; align-items: center; justify-content: space-between;
-    gap: 12px; box-shadow: 0 10px 28px rgba(0,0,0,0.25);
+    gap: 12px; box-shadow: 0 10px 28px rgba(0,0,0,0.3);
   }
   .kaydet-cubuk span { font-weight: 800; font-size: 15px; }
   .kaydet-cubuk button {
     background: var(--green); color: #fff; border: none;
-    padding: 12px 20px; border-radius: 14px; font-family: inherit;
+    padding: 12px 22px; border-radius: 14px; font-family: inherit;
     font-weight: 900; font-size: 16px; cursor: pointer; flex-shrink: 0;
   }
   .kaydet-cubuk button:disabled { opacity: 0.6; }
@@ -257,6 +264,8 @@
     </button>
   </header>
 
+  <div class="bildirim-serit" id="ustBildirim"></div>
+
   <nav class="sekmeler" role="tablist">
     <button class="sekme aktif" id="sekmeBugunBtn" onclick="sekmeAc('bugun')">☀️ Günlük Plan</button>
     <button class="sekme" id="sekmeHaftaBtn" onclick="sekmeAc('hafta')">🗓️ 7 Gün</button>
@@ -329,7 +338,7 @@
 
 <!-- DEĞİŞİKLİK YAPILDIĞINDA ÇIKAN SABİT KAYDET ÇUBUĞU -->
 <div class="kaydet-cubuk gizli" id="altKaydetCubuk">
-  <span id="degisiklikMetin">Değişiklikler hazır!</span>
+  <span id="degisiklikMetin">Saatler yeniden hesaplandı!</span>
   <button type="button" id="altKaydetBtn" onclick="degisiklikleriKaydet()">✅ Kaydet ve Takvimi Güncelle</button>
 </div>
 
@@ -380,6 +389,20 @@
     return (h < 10 ? '0' + h : '' + h) + ':' + (m < 10 ? '0' + m : '' + m);
   }
 
+  function cihazSimdiDakika() {
+    var d = new Date();
+    return d.getHours() * 60 + d.getMinutes();
+  }
+
+  function ustBildirimGoster(metin, basarili) {
+    var el = document.getElementById('ustBildirim');
+    el.textContent = metin;
+    el.className = 'bildirim-serit ' + (basarili ? 'ok' : 'err');
+    setTimeout(function () {
+      el.className = 'bildirim-serit';
+    }, 5000);
+  }
+
   function tarihParcala(dateKey) {
     var p = dateKey.split('-').map(Number);
     return new Date(p[0], p[1] - 1, p[2]);
@@ -414,11 +437,22 @@
   }
 
   /**
-   * ▲ / ▼ veya ✓ tıklandığında o günün saatlerini tarayıcıda ANINDA yeniden hesaplar!
+   * Bir görev tamamlandığında (erken bittiğinde) veya ▲/▼ ile sıra değiştiğinde
+   * kalan görevleri TAM ŞU ANKİ DAKİKADAN itibaren boşluklara kaydırır!
    */
   function yerelSaatleriHesapla(gun) {
     if (!gun || !gun.bloklar) return;
-    var pencereBas = dkCevir(gun.pencereBaslangic || (gun.tatil ? '10:00' : '17:00'));
+    var varsayilanBas = dkCevir(gun.tatil ? '10:00' : '17:00');
+    var pencereBas = varsayilanBas;
+
+    // Eğer bugündeysek, kalan görevleri tam şu anki dakikadan (cihaz saatinden) başlat!
+    if (gun.dateKey === DURUM.bugun) {
+      var simdiDk = cihazSimdiDakika();
+      DURUM.simdiSaat = saatCevir(simdiDk);
+      if (simdiDk > pencereBas && simdiDk < dkCevir('21:30')) {
+        pencereBas = simdiDk;
+      }
+    }
     var pencereBit = dkCevir('21:30');
 
     var tamamlananlar = [];
@@ -427,17 +461,19 @@
     var uykuBloklari = [];
 
     gun.bloklar.forEach(function (b) {
+      var sDk = b.sureDk || (b.start !== '✓' ? (dkCevir(b.end) - dkCevir(b.start)) : 30);
+      if (!sDk || sDk <= 0) sDk = 30;
+      b.sureDk = sDk;
+
       if (b.tur === 'uyku') {
         uykuBloklari.push(b);
-      } else if (b.yapildi || b.start === '✓') {
+      } else if (b.yapildi) {
         tamamlananlar.push(b);
       } else if (!b.otomatik || b.tur === 'okul') {
         b._basDk = dkCevir(b.start);
         b._bitDk = dkCevir(b.end);
         sabitler.push(b);
       } else {
-        var sDk = b.sureDk || (dkCevir(b.end) - dkCevir(b.start)) || 30;
-        b.sureDk = sDk;
         siralanabilirler.push(b);
       }
     });
@@ -466,7 +502,7 @@
           g.start = saatCevir(gBas);
           g.end = saatCevir(gBit);
           g._basDk = gBas;
-          dolu.push({ basDk: gBas, bitDk: gBit + 10 });
+          dolu.push({ basDk: gBas, bitDk: gBit + 5 }); // 5 dk mola payı
           yerlesenler.push(g);
           break;
         }
@@ -569,16 +605,16 @@
     var acik = isaretlemeAcikMi(secili.dateKey);
     var kilitNot = document.getElementById('kilitNot');
     if (DURUM.degisiklikVar) {
-      kilitNot.textContent = '💡 Saatler ekranda güncellendi! Takvime işlemek için "Kaydet ve Takvimi Güncelle" tuşuna bas.';
+      kilitNot.textContent = '💡 Saatler kaydırıldı! Google Takvim’e işlemek için "Kaydet ve Takvimi Güncelle" tuşuna bas.';
     } else {
-      kilitNot.textContent = '🔼🔽 Oklarla istediğin kadar sıra değiştir veya ✓ işaretle, sonra "Güncelle" tuşuna bas.';
+      kilitNot.textContent = '🔼🔽 Oklarla sıra değiştir veya erken biten görevi ✓ işaretle, saatler anında kayacaktır.';
     }
 
     var siralanabilirler = secili.bloklar.filter(blokSiralanabilirMi);
 
     var listeHtml = secili.bloklar.map(function (b) {
       var tb = TUR_BILGI[b.tur] || TUR_BILGI.diger;
-      var simdiMi = (secili.dateKey === DURUM.bugun) && (DURUM.simdiSaat >= b.start && DURUM.simdiSaat < b.end);
+      var simdiMi = (secili.dateKey === DURUM.bugun) && !b.yapildi && (DURUM.simdiSaat >= b.start && DURUM.simdiSaat < b.end);
       var kartSinif = 'kart tur-' + b.tur + (simdiMi ? ' simdi' : '') + (b.yapildi ? ' tamam' : '');
       var otomatikEtiket = b.otomatik ? '<span class="etiket">Akıllı plan</span>' : '<span class="etiket">' + tb.etiket + '</span>';
       var dugmeSinif = 'isaret' + (b.yapildi ? ' aktif' : '');
@@ -643,9 +679,12 @@
     });
   }
 
+  /**
+   * TÜM İSTEKLERİ %100 ÇALIŞAN GET YÖNTEMİYLE GÖNDERİR (302 POST Kaybını Önler!)
+   */
   function sunucuCagir(metot, argumanlar, basari, hata) {
     var hataYakalayici = hata || function (err) {
-      alert('Bir sorun oluştu: ' + (err && err.message ? err.message : err));
+      ustBildirimGoster('Hata: ' + (err && err.message ? err.message : err), false);
     };
 
     if (window.google && google.script && google.script.run) {
@@ -655,52 +694,44 @@
     }
 
     if (!ANAHTAR) {
-      hataYakalayici(new Error('Bağlantı anahtarı (?k=...) eksik! Babandan doğru bağlantıyı iste.'));
+      hataYakalayici(new Error('Bağlantı anahtarı (?k=...) eksik!'));
       return;
     }
+
+    var url = new URL(APPS_SCRIPT_URL);
+    url.searchParams.set('k', argumanlar[0] || ANAHTAR);
+    url.searchParams.set('_t', Date.now());
 
     if (metot === 'haftaGetir') {
-      var url = new URL(APPS_SCRIPT_URL);
       url.searchParams.set('api', 'hafta');
-      url.searchParams.set('k', argumanlar[0] || ANAHTAR);
       if (argumanlar[1]) url.searchParams.set('baslangic', argumanlar[1]);
-      url.searchParams.set('_t', Date.now());
-
-      fetch(url.toString(), {
-        method: 'GET',
-        credentials: 'omit',
-        redirect: 'follow'
-      })
-      .then(function (r) { return r.json(); })
-      .then(function (res) {
-        if (!res.ok) throw new Error(res.hata || 'Sunucu hatası');
-        basari(res.veri);
-      })
-      .catch(hataYakalayici);
-      return;
-    }
-
-    var payload = { islem: metot, anahtar: argumanlar[0] || ANAHTAR };
-    if (metot === 'topluGuncelle') {
-      payload.tarih = argumanlar[1];
-      payload.siralama = argumanlar[2];
-      payload.isaretler = argumanlar[3];
+    } else if (metot === 'topluGuncelle') {
+      url.searchParams.set('api', 'kaydet');
+      url.searchParams.set('veri', JSON.stringify({
+        tarih: argumanlar[1],
+        siralama: argumanlar[2],
+        isaretler: argumanlar[3]
+      }));
     } else if (metot === 'oyunEkle') {
-      payload.tarih = argumanlar[1];
-      payload.baslik = argumanlar[2];
-      payload.baslangic = argumanlar[3];
-      payload.bitis = argumanlar[4];
+      url.searchParams.set('api', 'oyunEkle');
+      url.searchParams.set('veri', JSON.stringify({
+        tarih: argumanlar[1],
+        baslik: argumanlar[2],
+        baslangic: argumanlar[3],
+        bitis: argumanlar[4]
+      }));
     } else if (metot === 'okulYokEkle') {
-      payload.tarih = argumanlar[1];
-      payload.aciklama = argumanlar[2];
+      url.searchParams.set('api', 'okulYokEkle');
+      url.searchParams.set('veri', JSON.stringify({
+        tarih: argumanlar[1],
+        aciklama: argumanlar[2]
+      }));
     }
 
-    fetch(APPS_SCRIPT_URL, {
-      method: 'POST',
+    fetch(url.toString(), {
+      method: 'GET',
       credentials: 'omit',
-      redirect: 'follow',
-      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-      body: JSON.stringify(payload)
+      redirect: 'follow'
     })
     .then(function (r) { return r.json(); })
     .then(function (res) {
@@ -732,7 +763,6 @@
     gun.bloklar[idx1] = gun.bloklar[idx2];
     gun.bloklar[idx2] = gecici;
 
-    // Saatleri anında yeniden hesapla (sabit derslere çarpmadan!)
     yerelSaatleriHesapla(gun);
 
     DURUM.bekleyenSiralamalar[dateKey] = gun.bloklar
@@ -743,6 +773,9 @@
     ciz();
   }
 
+  /**
+   * Görev tamamlandığında (erken bittiğinde) kalan görevleri anında şu anki saate kaydırır!
+   */
   function gorevTikla(idKod, dateKey) {
     var id = decodeURIComponent(idKod);
     var gun = DURUM.gunler.find(function (g) { return g.dateKey === dateKey; });
@@ -751,10 +784,6 @@
     if (!blok) return;
 
     blok.yapildi = !blok.yapildi;
-    if (!blok.yapildi && blok.start === '✓') {
-      blok.start = '10:00';
-      blok.end = '10:30';
-    }
     yerelSaatleriHesapla(gun);
 
     DURUM.bekleyenIsaretler[id] = blok.yapildi;
@@ -781,13 +810,14 @@
       DURUM.kaydediliyor = false;
       if (yeniVeri && yeniVeri.gunler) {
         veriUygula(yeniVeri, aktifGun);
+        ustBildirimGoster('✅ Plan kaydedildi ve Google Takvim saatleri güncellendi!', true);
       } else {
         verileriYukle(aktifGun);
       }
     }, function (err) {
       DURUM.kaydediliyor = false;
       ciz();
-      alert('Güncelleme sırasında hata oluştu: ' + (err && err.message ? err.message : err));
+      ustBildirimGoster('❌ Güncelleme hatası: ' + (err && err.message ? err.message : err), false);
     });
   }
 
