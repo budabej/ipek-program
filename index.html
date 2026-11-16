@@ -46,6 +46,10 @@
   }
   .selam h1 { margin: 0; font-size: 24px; font-weight: 900; }
   .selam p { margin: 4px 0 0; color: var(--muted); font-weight: 700; font-size: 15px; }
+  .surum-etiket {
+    font-size: 11px; background: #fff; color: var(--accent);
+    padding: 2px 7px; border-radius: 999px; vertical-align: middle; margin-left: 6px;
+  }
   .yildiz-kutu {
     background: #fff; padding: 10px 16px; border-radius: 18px;
     display: flex; align-items: center; gap: 10px;
@@ -106,7 +110,7 @@
   .liste { margin-top: 16px; display: flex; flex-direction: column; gap: 12px; }
   .kart {
     background: var(--card); border-radius: 20px; padding: 14px 16px;
-    display: flex; align-items: center; gap: 14px;
+    display: flex; align-items: center; gap: 12px;
     box-shadow: 0 4px 12px rgba(45, 42, 50, 0.05);
     border: 2px solid transparent;
   }
@@ -136,6 +140,19 @@
   .tur-oyun  .ikon, .tur-oyun  .etiket { background: var(--oyun);  color: var(--oyun-ink); }
   .tur-uyku  .ikon, .tur-uyku  .etiket { background: var(--uyku);  color: var(--uyku-ink); }
   .tur-diger .ikon, .tur-diger .etiket { background: var(--diger); color: var(--diger-ink); }
+
+  .sira-kutu {
+    display: flex; flex-direction: column; gap: 5px; flex-shrink: 0;
+  }
+  .sira-btn {
+    width: 42px; height: 30px; border-radius: 10px;
+    border: 2px solid #E2D5C5; background: #FFF8F0;
+    color: var(--ink); font-size: 14px; font-weight: 900;
+    cursor: pointer; display: flex; align-items: center; justify-content: center;
+    padding: 0;
+  }
+  .sira-btn:active { background: var(--accent); color: #fff; border-color: var(--accent); }
+  .sira-btn:disabled { opacity: 0.25; cursor: not-allowed; }
 
   .isaret {
     width: 56px; height: 56px; border-radius: 16px;
@@ -214,7 +231,7 @@
 <div class="wrap">
   <header class="ust">
     <div class="selam">
-      <h1>Merhaba İpek! 🌸</h1>
+      <h1>Merhaba İpek! 🌸 <span class="surum-etiket">v2.0</span></h1>
       <p id="seciliTarihMetin">Yükleniyor…</p>
     </div>
     <div class="yildiz-kutu" title="Bugün tamamlanan görevler">
@@ -306,7 +323,8 @@
     simdiSaat: '00:00',
     isaretlemeSaati: '18:00',
     seciliGun: null,
-    gunler: []
+    gunler: [],
+    islemSuruyor: false
   };
 
   var TUR_BILGI = {
@@ -351,10 +369,29 @@
     return DURUM.simdiSaat >= DURUM.isaretlemeSaati;
   }
 
+  function blokSiralanabilirMi(b) {
+    if (!b || b.yapildi || b.start === '✓') return false;
+    if (b.tur === 'uyku' || b.tur === 'okul') return false;
+    if (b.siralanabilir === true) return true;
+    return Boolean(b.otomatik);
+  }
+
   function gunSec(dateKey) {
     DURUM.seciliGun = dateKey;
     document.getElementById('oyunTarih').value = dateKey;
     document.getElementById('tatilTarih').value = dateKey;
+    ciz();
+  }
+
+  function veriUygula(veri, hedefGun) {
+    if (!veri || !veri.gunler) return;
+    DURUM.bugun = veri.bugun;
+    DURUM.simdiSaat = veri.simdiSaat;
+    DURUM.isaretlemeSaati = veri.isaretlemeSaati || '18:00';
+    DURUM.gunler = veri.gunler || [];
+    DURUM.seciliGun = hedefGun || DURUM.seciliGun || veri.bugun;
+    document.getElementById('oyunTarih').value = DURUM.seciliGun;
+    document.getElementById('tatilTarih').value = DURUM.seciliGun;
     ciz();
   }
 
@@ -398,11 +435,11 @@
     var acik = isaretlemeAcikMi(secili.dateKey);
     var kilitNot = document.getElementById('kilitNot');
     if (secili.dateKey > DURUM.bugun) {
-      kilitNot.textContent = '⏳ Gelecek günlerin görevleri günü geldiğinde saat ' + DURUM.isaretlemeSaati + '’den sonra işaretlenebilir.';
+      kilitNot.textContent = '▲▼ Ok tuşlarıyla ödev sırasını değiştirebilirsin. İşaretleme günü geldiğinde açılır.';
     } else if (!acik) {
-      kilitNot.textContent = '🕕 Yaptıklarını saat ' + DURUM.isaretlemeSaati + '’den sonra işaretleyebilirsin. Şimdi planına bak!';
+      kilitNot.textContent = '▲▼ Oklarla sırayı değiştirebilirsin. İşaretleme saat ' + DURUM.isaretlemeSaati + '’den sonra açılır.';
     } else {
-      kilitNot.textContent = '✅ Yaptığın görevlerin yanındaki kutuya dokunarak yıldızları topla!';
+      kilitNot.textContent = '✅ Yaptıklarını işaretle veya ▲▼ oklarla sırasını değiştir; Google Takvim anında güncellenir!';
     }
 
     var sayilabilir = secili.bloklar.filter(function (b) { return b.tur !== 'uyku'; });
@@ -412,22 +449,41 @@
     document.getElementById('yildizMetin').textContent = '★'.repeat(yildizSayisi) + '☆'.repeat(5 - yildizSayisi);
     document.getElementById('yildizSayac').textContent = tamamSay + '/' + toplam;
 
+    var siralanabilirler = secili.bloklar.filter(blokSiralanabilirMi);
+
     var listeHtml = secili.bloklar.map(function (b) {
       var tb = TUR_BILGI[b.tur] || TUR_BILGI.diger;
       var simdiMi = (secili.dateKey === DURUM.bugun) && (DURUM.simdiSaat >= b.start && DURUM.simdiSaat < b.end);
       var kartSinif = 'kart tur-' + b.tur + (simdiMi ? ' simdi' : '') + (b.yapildi ? ' tamam' : '');
       var otomatikEtiket = b.otomatik ? '<span class="etiket">Akıllı plan</span>' : '<span class="etiket">' + tb.etiket + '</span>';
       var dugmeSinif = 'isaret' + (b.yapildi ? ' aktif' : '');
-      var kilitli = (!acik || b.tur === 'uyku') ? ' disabled' : '';
+      var kilitli = (!acik || b.tur === 'uyku' || DURUM.islemSuruyor) ? ' disabled' : '';
       var idKod = encodeURIComponent(b.id);
+      var baslikKod = encodeURIComponent(b.title);
+      var saatMetni = (b.start === '✓') ? '✓ Tamamlandı' : (b.start + ' – ' + b.end);
+
+      var siraButonlariHtml = '';
+      if (blokSiralanabilirMi(b)) {
+        var sIdx = siralanabilirler.indexOf(b);
+        var ilkMi = (sIdx <= 0) || DURUM.islemSuruyor;
+        var sonMu = (sIdx === -1 || sIdx >= siralanabilirler.length - 1) || DURUM.islemSuruyor;
+        siraButonlariHtml = '<div class="sira-kutu">' +
+          '<button type="button" class="sira-btn" title="Üste taşı" ' + (ilkMi ? 'disabled' : '') +
+            ' onclick="gorevTasi(\'' + baslikKod + '\', \'' + secili.dateKey + '\', \'yukari\')">▲</button>' +
+          '<button type="button" class="sira-btn" title="Alta taşı" ' + (sonMu ? 'disabled' : '') +
+            ' onclick="gorevTasi(\'' + baslikKod + '\', \'' + secili.dateKey + '\', \'asagi\')">▼</button>' +
+        '</div>';
+      }
+
       return '<div class="' + kartSinif + '">' +
         '<div class="ikon">' + tb.ikon + '</div>' +
         '<div class="govde">' +
-          '<div class="saat">' + b.start + ' – ' + b.end + otomatikEtiket + '</div>' +
+          '<div class="saat">' + saatMetni + otomatikEtiket + '</div>' +
           '<div class="baslik">' + escapeHtml(b.title) + '</div>' +
         '</div>' +
+        siraButonlariHtml +
         (b.tur === 'uyku' ? '' :
-          '<button class="' + dugmeSinif + '"' + kilitli +
+          '<button type="button" class="' + dugmeSinif + '"' + kilitli +
             ' aria-label="Görev işaretle" onclick="gorevTikla(\'' + idKod + '\', \'' + secili.dateKey + '\')">' +
             (b.yapildi ? '✓' : '') + '</button>') +
       '</div>';
@@ -438,8 +494,9 @@
       var d = tarihParcala(g.dateKey);
       var bugunSinif = g.dateKey === DURUM.bugun ? ' bugun' : '';
       var miniHtml = g.bloklar.map(function (b) {
+        var mSaat = (b.start === '✓') ? '✓ Bitti' : (b.start + '–' + b.end + (b.yapildi ? ' ✓' : ''));
         return '<div class="mini tur-' + b.tur + '" style="background:var(--' + b.tur + ');color:var(--' + b.tur + '-ink)">' +
-          '<span class="m-saat">' + b.start + '–' + b.end + (b.yapildi ? ' ✓' : '') + '</span>' +
+          '<span class="m-saat">' + mSaat + '</span>' +
           escapeHtml(b.title) + '</div>';
       }).join('');
       return '<div class="gun-sutun' + bugunSinif + '" onclick="haftadanGuneGit(\'' + g.dateKey + '\')">' +
@@ -482,6 +539,7 @@
       url.searchParams.set('api', 'hafta');
       url.searchParams.set('k', argumanlar[0] || ANAHTAR);
       if (argumanlar[1]) url.searchParams.set('baslangic', argumanlar[1]);
+      url.searchParams.set('_t', Date.now()); // Önbelleği (cache) devre dışı bırak
 
       fetch(url.toString(), {
         method: 'GET',
@@ -502,6 +560,10 @@
       payload.id = argumanlar[1];
       payload.tarih = argumanlar[2];
       payload.yapildi = argumanlar[3];
+    } else if (metot === 'siraDegistir') {
+      payload.tarih = argumanlar[1];
+      payload.baslik = argumanlar[2];
+      payload.yon = argumanlar[3];
     } else if (metot === 'oyunEkle') {
       payload.tarih = argumanlar[1];
       payload.baslik = argumanlar[2];
@@ -527,6 +589,48 @@
     .catch(hataYakalayici);
   }
 
+  function gorevTasi(baslikKod, dateKey, yon) {
+    var baslik = decodeURIComponent(baslikKod);
+    var gun = DURUM.gunler.find(function (g) { return g.dateKey === dateKey; });
+    if (gun && gun.bloklar) {
+      // Ekranda anında yer değiştir (Optimistic UI)
+      var siralanabilirIndexler = [];
+      gun.bloklar.forEach(function (b, idx) {
+        if (blokSiralanabilirMi(b)) siralanabilirIndexler.push(idx);
+      });
+      var mevcutSiraliPos = siralanabilirIndexler.findIndex(function (blokIdx) {
+        return gun.bloklar[blokIdx].title === baslik;
+      });
+      var hedefSiraliPos = (yon === 'yukari') ? mevcutSiraliPos - 1 : mevcutSiraliPos + 1;
+      if (mevcutSiraliPos !== -1 && hedefSiraliPos >= 0 && hedefSiraliPos < siralanabilirIndexler.length) {
+        var idx1 = siralanabilirIndexler[mevcutSiraliPos];
+        var idx2 = siralanabilirIndexler[hedefSiraliPos];
+        // Saatleri sabit tutup başlık, id ve türleri takas et ki anında görünsün
+        var b1 = gun.bloklar[idx1];
+        var b2 = gun.bloklar[idx2];
+        var gecici = { id: b1.id, title: b1.title, tur: b1.tur };
+        b1.id = b2.id; b1.title = b2.title; b1.tur = b2.tur;
+        b2.id = gecici.id; b2.title = gecici.title; b2.tur = gecici.tur;
+      }
+    }
+
+    DURUM.islemSuruyor = true;
+    ciz();
+
+    sunucuCagir('siraDegistir', [ANAHTAR, dateKey, baslik, yon], function (yeniVeri) {
+      DURUM.islemSuruyor = false;
+      if (yeniVeri && yeniVeri.gunler) {
+        veriUygula(yeniVeri, dateKey);
+      } else {
+        verileriYukle(dateKey);
+      }
+    }, function (err) {
+      DURUM.islemSuruyor = false;
+      verileriYukle(dateKey);
+      alert('Sıralama kaydedilirken hata oluştu (Apps Script Yeni Sürüm dağıtımını kontrol edin): ' + (err && err.message ? err.message : err));
+    });
+  }
+
   function gorevTikla(idKod, dateKey) {
     var id = decodeURIComponent(idKod);
     var gun = DURUM.gunler.find(function (g) { return g.dateKey === dateKey; });
@@ -535,9 +639,18 @@
     if (!blok) return;
     var yeniDurum = !blok.yapildi;
     blok.yapildi = yeniDurum;
+    DURUM.islemSuruyor = true;
     ciz();
 
-    sunucuCagir('isaretle', [ANAHTAR, id, dateKey, yeniDurum], function () {}, function (err) {
+    sunucuCagir('isaretle', [ANAHTAR, id, dateKey, yeniDurum], function (yeniVeri) {
+      DURUM.islemSuruyor = false;
+      if (yeniVeri && yeniVeri.gunler) {
+        veriUygula(yeniVeri, dateKey);
+      } else {
+        verileriYukle(dateKey);
+      }
+    }, function (err) {
+      DURUM.islemSuruyor = false;
       blok.yapildi = !yeniDurum;
       ciz();
       alert('İşaret kaydedilemedi: ' + (err && err.message ? err.message : err));
@@ -563,11 +676,12 @@
 
     var btn = document.getElementById('oyunKaydetBtn');
     btn.disabled = true;
-    sunucuCagir('oyunEkle', [ANAHTAR, tarih, baslik, bas, bit], function () {
+    sunucuCagir('oyunEkle', [ANAHTAR, tarih, baslik, bas, bit], function (yeniVeri) {
       btn.disabled = false;
       document.getElementById('oyunBaslik').value = '';
       mesajGoster('oyunMesaj', 'Harika! Programa eklendi 🎉', true);
-      verileriYukle(tarih);
+      if (yeniVeri && yeniVeri.gunler) veriUygula(yeniVeri, tarih);
+      else verileriYukle(tarih);
     }, function (err) {
       btn.disabled = false;
       mesajGoster('oyunMesaj', err.message || String(err), false);
@@ -579,11 +693,12 @@
     var aciklama = document.getElementById('tatilAciklama').value.trim();
     var btn = document.getElementById('tatilKaydetBtn');
     btn.disabled = true;
-    sunucuCagir('okulYokEkle', [ANAHTAR, tarih, aciklama], function () {
+    sunucuCagir('okulYokEkle', [ANAHTAR, tarih, aciklama], function (yeniVeri) {
       btn.disabled = false;
       document.getElementById('tatilAciklama').value = '';
       mesajGoster('tatilMesaj', 'Tatil günü kaydedildi! Programın 10:00’dan başlayacak 🏖️', true);
-      verileriYukle(tarih);
+      if (yeniVeri && yeniVeri.gunler) veriUygula(yeniVeri, tarih);
+      else verileriYukle(tarih);
     }, function (err) {
       btn.disabled = false;
       mesajGoster('tatilMesaj', err.message || String(err), false);
@@ -592,14 +707,7 @@
 
   function verileriYukle(hedefGun) {
     sunucuCagir('haftaGetir', [ANAHTAR, null], function (veri) {
-      DURUM.bugun = veri.bugun;
-      DURUM.simdiSaat = veri.simdiSaat;
-      DURUM.isaretlemeSaati = veri.isaretlemeSaati || '18:00';
-      DURUM.gunler = veri.gunler || [];
-      DURUM.seciliGun = hedefGun || DURUM.seciliGun || veri.bugun;
-      document.getElementById('oyunTarih').value = DURUM.seciliGun;
-      document.getElementById('tatilTarih').value = DURUM.seciliGun;
-      ciz();
+      veriUygula(veri, hedefGun);
     }, function (err) {
       document.getElementById('gorevListesi').innerHTML =
         '<div class="uyari-serit">Bağlantı kurulamadı: ' + escapeHtml(err && err.message ? err.message : String(err)) + '</div>';
