@@ -48,10 +48,22 @@
   .selam h1 { margin: 0; font-size: 24px; font-weight: 900; }
   .selam p { margin: 4px 0 0; color: var(--muted); font-weight: 700; font-size: 15px; }
 
+  .ust-butonlar {
+    display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  }
+  .ses-btn {
+    background: #fff; color: #5A2E98; border: 2px solid #EDE2FF;
+    padding: 12px 14px; border-radius: 16px; font-family: inherit;
+    font-weight: 900; font-size: 14px; cursor: pointer;
+    display: flex; align-items: center; gap: 6px;
+    box-shadow: 0 3px 10px rgba(0,0,0,0.06);
+  }
+  .ses-btn.kapali { opacity: 0.6; color: var(--muted); border-color: var(--line); }
+
   .ust-senkron-btn {
     background: #fff; color: var(--ink); border: 2px solid var(--line);
-    padding: 12px 18px; border-radius: 16px; font-family: inherit;
-    font-weight: 900; font-size: 15px; cursor: pointer;
+    padding: 12px 16px; border-radius: 16px; font-family: inherit;
+    font-weight: 900; font-size: 14px; cursor: pointer;
     display: flex; align-items: center; gap: 6px;
     box-shadow: 0 3px 10px rgba(0,0,0,0.06);
   }
@@ -146,7 +158,7 @@
   .ikon {
     width: 54px; height: 54px; border-radius: 16px;
     display: flex; align-items: center; justify-content: center;
-    font-size: 26px; flex-shrink: 0;
+    font-size: 26px; flex-shrink: 0; cursor: pointer;
   }
   .govde { flex: 1; min-width: 0; }
   .saat { font-size: 14px; font-weight: 800; color: var(--muted); }
@@ -259,9 +271,14 @@
       <h1>Merhaba İpek! 🌸</h1>
       <p id="seciliTarihMetin">Yükleniyor…</p>
     </div>
-    <button type="button" class="ust-senkron-btn" id="ustGuncelleBtn" onclick="degisiklikleriKaydet()">
-      🔄 Planı ve Takvimi Güncelle
-    </button>
+    <div class="ust-butonlar">
+      <button type="button" class="ses-btn" id="sesOkuBtn" onclick="siradakiGoreviSeslendir(true)" title="Sıradaki görevi sesli oku">
+        🔊 Sesli Oku
+      </button>
+      <button type="button" class="ust-senkron-btn" id="ustGuncelleBtn" onclick="degisiklikleriKaydet()">
+        🔄 Planı ve Takvimi Güncelle
+      </button>
+    </div>
   </header>
 
   <div class="bildirim-serit" id="ustBildirim"></div>
@@ -359,7 +376,8 @@
     kaydediliyor: false,
     degisiklikVar: false,
     bekleyenIsaretler: {},
-    bekleyenSiralamalar: {}
+    bekleyenSiralamalar: {},
+    okunanGorevAnahtarlari: {}
   };
 
   var TUR_BILGI = {
@@ -377,6 +395,98 @@
   var GUN_KISA = ['Paz', 'Pzt', 'Sal', 'Çar', 'Per', 'Cum', 'Cmt'];
   var GUN_UZUN = ['Pazar', 'Pazartesi', 'Salı', 'Çarşamba', 'Perşembe', 'Cuma', 'Cumartesi'];
   var AYLAR = ['Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran', 'Temmuz', 'Ağustos', 'Eylül', 'Ekim', 'Kasım', 'Aralık'];
+
+  /* --- TÜRKÇE SESLİ ASİSTAN (WEB SPEECH API + DİNG-DONG) --- */
+  function dingDongCal(bitinceCallback) {
+    try {
+      var AudioCtx = window.AudioContext || window.webkitAudioContext;
+      if (!AudioCtx) { if (bitinceCallback) bitinceCallback(); return; }
+      var ctx = new AudioCtx();
+      var osc1 = ctx.createOscillator();
+      var gain1 = ctx.createGain();
+      osc1.type = 'sine';
+      osc1.frequency.setValueAtTime(659.25, ctx.currentTime); // E5
+      osc1.frequency.setValueAtTime(523.25, ctx.currentTime + 0.25); // C5
+      gain1.gain.setValueAtTime(0.2, ctx.currentTime);
+      gain1.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.7);
+      osc1.connect(gain1);
+      gain1.connect(ctx.destination);
+      osc1.start();
+      osc1.stop(ctx.currentTime + 0.7);
+      setTimeout(function () {
+        if (bitinceCallback) bitinceCallback();
+      }, 650);
+    } catch (e) {
+      if (bitinceCallback) bitinceCallback();
+    }
+  }
+
+  function metniSeslendir(metin, zilCalsinMi) {
+    if (!('speechSynthesis' in window)) return;
+    var temizMetin = String(metin || '')
+      .replace(/[🌸🎒🩰🎹✏️🧠📖🎨🌙📌✅🔄⏳💡⚠️ℹ️]/g, '')
+      .replace(/—/g, ', ')
+      .trim();
+
+    var konus = function () {
+      try {
+        window.speechSynthesis.cancel();
+        var u = new SpeechSynthesisUtterance(temizMetin);
+        u.lang = 'tr-TR';
+        u.rate = 0.98;
+        u.pitch = 1.05;
+        var sesler = window.speechSynthesis.getVoices() || [];
+        var trSes = sesler.find(function (v) { return v.lang && v.lang.toLowerCase().indexOf('tr') === 0; });
+        if (trSes) u.voice = trSes;
+        window.speechSynthesis.speak(u);
+      } catch (e) {}
+    };
+
+    if (zilCalsinMi) dingDongCal(konus);
+    else konus();
+  }
+
+  function siradakiGoreviSeslendir(manuelTiklandi) {
+    var secili = DURUM.gunler.find(function (g) { return g.dateKey === (DURUM.seciliGun || DURUM.bugun); });
+    if (!secili || !secili.bloklar) return;
+
+    var simdi = saatCevir(cihazSimdiDakika());
+    var aktif = secili.bloklar.find(function (b) {
+      return !b.yapildi && b.start !== '✓' && simdi >= b.start && simdi < b.end;
+    });
+    var siradaki = secili.bloklar.find(function (b) {
+      return !b.yapildi && b.start !== '✓' && b.start > simdi;
+    });
+
+    if (aktif) {
+      metniSeslendir('İpekciğim, şu anda saat ' + aktif.start + ' ile ' + aktif.end + ' arasında ' + aktif.title + ' görevin var.', true);
+    } else if (siradaki) {
+      metniSeslendir('İpekciğim, sıradaki görevin saat ' + siradaki.start + '’da başlıyor: ' + siradaki.title, true);
+    } else if (manuelTiklandi) {
+      metniSeslendir('Harikasın İpek! Bugünkü tüm görevlerini tamamladın, iyi dinlenmeler!', true);
+    }
+  }
+
+  function otomatikSaatAnonsKontrol() {
+    if (!DURUM.bugun || !DURUM.gunler.length) return;
+    var bugunGun = DURUM.gunler.find(function (g) { return g.dateKey === DURUM.bugun; });
+    if (!bugunGun || !bugunGun.bloklar) return;
+
+    var simdi = saatCevir(cihazSimdiDakika());
+    DURUM.simdiSaat = simdi;
+
+    bugunGun.bloklar.forEach(function (b) {
+      if (b.yapildi || b.start === '✓') return;
+      var anahtar = DURUM.bugun + '|' + b.start + '|' + b.title;
+      // Tam görevin başlangıç dakikası geldiğinde 1 kez sesli anons yap
+      if (b.start === simdi && !DURUM.okunanGorevAnahtarlari[anahtar]) {
+        DURUM.okunanGorevAnahtarlari[anahtar] = true;
+        ustBildirimGoster('🔊 Şimdi Başlıyor (' + b.start + '): ' + b.title, true);
+        metniSeslendir('İpekciğim, saat ' + b.start + ' oldu. Şimdi sırada ' + b.title + ' var. Kolay gelsin!', true);
+        ciz();
+      }
+    });
+  }
 
   function dkCevir(s) {
     var p = String(s || '00:00').split(':').map(Number);
@@ -400,7 +510,7 @@
     el.className = 'bildirim-serit ' + (basarili ? 'ok' : 'err');
     setTimeout(function () {
       el.className = 'bildirim-serit';
-    }, 5000);
+    }, 6000);
   }
 
   function tarihParcala(dateKey) {
@@ -436,16 +546,11 @@
     return Boolean(b.otomatik);
   }
 
-  /**
-   * Bir görev tamamlandığında (erken bittiğinde) veya ▲/▼ ile sıra değiştiğinde
-   * kalan görevleri TAM ŞU ANKİ DAKİKADAN itibaren boşluklara kaydırır!
-   */
   function yerelSaatleriHesapla(gun) {
     if (!gun || !gun.bloklar) return;
     var varsayilanBas = dkCevir(gun.tatil ? '10:00' : '17:00');
     var pencereBas = varsayilanBas;
 
-    // Eğer bugündeysek, kalan görevleri tam şu anki dakikadan (cihaz saatinden) başlat!
     if (gun.dateKey === DURUM.bugun) {
       var simdiDk = cihazSimdiDakika();
       DURUM.simdiSaat = saatCevir(simdiDk);
@@ -502,7 +607,7 @@
           g.start = saatCevir(gBas);
           g.end = saatCevir(gBit);
           g._basDk = gBas;
-          dolu.push({ basDk: gBas, bitDk: gBit + 5 }); // 5 dk mola payı
+          dolu.push({ basDk: gBas, bitDk: gBit + 5 });
           yerlesenler.push(g);
           break;
         }
@@ -607,7 +712,7 @@
     if (DURUM.degisiklikVar) {
       kilitNot.textContent = '💡 Saatler kaydırıldı! Google Takvim’e işlemek için "Kaydet ve Takvimi Güncelle" tuşuna bas.';
     } else {
-      kilitNot.textContent = '🔼🔽 Oklarla sıra değiştir veya erken biten görevi ✓ işaretle, saatler anında kayacaktır.';
+      kilitNot.textContent = '🔊 Kartın solundaki ikona dokunarak görevi sesli dinleyebilir, ▲▼ ile sırasını değiştirebilirsin.';
     }
 
     var siralanabilirler = secili.bloklar.filter(blokSiralanabilirMi);
@@ -637,7 +742,7 @@
       }
 
       return '<div class="' + kartSinif + '">' +
-        '<div class="ikon">' + tb.ikon + '</div>' +
+        '<div class="ikon" title="Sesli dinlemek için dokun" onclick="kartSeslendir(\'' + baslikKod + '\', \'' + b.start + '\', \'' + b.end + '\')">' + tb.ikon + '</div>' +
         '<div class="govde">' +
           '<div class="saat">' + saatMetni + otomatikEtiket + '</div>' +
           '<div class="baslik">' + escapeHtml(b.title) + '</div>' +
@@ -668,6 +773,15 @@
     document.getElementById('haftaIzgara').innerHTML = haftaHtml;
   }
 
+  function kartSeslendir(baslikKod, bas, bit) {
+    var baslik = decodeURIComponent(baslikKod);
+    if (bas === '✓') {
+      metniSeslendir(baslik + ', tamamlandı.', false);
+    } else {
+      metniSeslendir('Saat ' + bas + ' ile ' + bit + ' arası: ' + baslik, false);
+    }
+  }
+
   function haftadanGuneGit(dateKey) {
     gunSec(dateKey);
     sekmeAc('bugun');
@@ -679,9 +793,6 @@
     });
   }
 
-  /**
-   * TÜM İSTEKLERİ %100 ÇALIŞAN GET YÖNTEMİYLE GÖNDERİR (302 POST Kaybını Önler!)
-   */
   function sunucuCagir(metot, argumanlar, basari, hata) {
     var hataYakalayici = hata || function (err) {
       ustBildirimGoster('Hata: ' + (err && err.message ? err.message : err), false);
@@ -773,9 +884,6 @@
     ciz();
   }
 
-  /**
-   * Görev tamamlandığında (erken bittiğinde) kalan görevleri anında şu anki saate kaydırır!
-   */
   function gorevTikla(idKod, dateKey) {
     var id = decodeURIComponent(idKod);
     var gun = DURUM.gunler.find(function (g) { return g.dateKey === dateKey; });
@@ -785,6 +893,15 @@
 
     blok.yapildi = !blok.yapildi;
     yerelSaatleriHesapla(gun);
+
+    if (blok.yapildi) {
+      var siradaki = gun.bloklar.find(blokSiralanabilirMi);
+      if (siradaki) {
+        metniSeslendir('Harikasın İpek! Şimdi sıradaki görevin: ' + siradaki.title, true);
+      } else {
+        metniSeslendir('Harikasın İpek! Bugünkü görevlerini bitirdin!', true);
+      }
+    }
 
     DURUM.bekleyenIsaretler[id] = blok.yapildi;
     DURUM.bekleyenSiralamalar[dateKey] = gun.bloklar
@@ -878,12 +995,18 @@
     });
   }
 
+  // Her 25 saniyede bir görev başlangıç saatini kontrol et ve saati gelen görevi sesli anons et!
+  setInterval(otomatikSaatAnonsKontrol, 25 * 1000);
+
   setInterval(function () {
     if (!DURUM.degisiklikVar && !DURUM.kaydediliyor) {
       verileriYukle(DURUM.seciliGun);
     }
   }, 5 * 60 * 1000);
 
+  if ('speechSynthesis' in window) {
+    window.speechSynthesis.getVoices();
+  }
   verileriYukle();
 </script>
 </body>
