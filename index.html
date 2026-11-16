@@ -17,6 +17,7 @@
     --muted: #7A7585;
     --line: #F0E6D8;
     --accent: #FF7A59;
+    --green: #2BB673;
     --okul: #DCEBFF;   --okul-ink: #1F4E8C;
     --dans: #FFE0EC;   --dans-ink: #9C2B5E;
     --muzik: #EDE2FF;  --muzik-ink: #5A2E98;
@@ -33,7 +34,7 @@
     font-family: 'Nunito', -apple-system, BlinkMacSystemFont, sans-serif;
     background: var(--bg);
     color: var(--ink);
-    padding-bottom: 40px;
+    padding-bottom: 90px;
   }
   .wrap { max-width: 760px; margin: 0 auto; padding: 18px 18px 40px; }
 
@@ -46,17 +47,34 @@
   }
   .selam h1 { margin: 0; font-size: 24px; font-weight: 900; }
   .selam p { margin: 4px 0 0; color: var(--muted); font-weight: 700; font-size: 15px; }
-  .surum-etiket {
-    font-size: 11px; background: #fff; color: var(--accent);
-    padding: 2px 7px; border-radius: 999px; vertical-align: middle; margin-left: 6px;
-  }
-  .yildiz-kutu {
-    background: #fff; padding: 10px 16px; border-radius: 18px;
-    display: flex; align-items: center; gap: 10px;
-    font-weight: 800; font-size: 16px;
+
+  .ust-senkron-btn {
+    background: #fff; color: var(--ink); border: 2px solid var(--line);
+    padding: 10px 16px; border-radius: 16px; font-family: inherit;
+    font-weight: 800; font-size: 14px; cursor: pointer;
+    display: flex; align-items: center; gap: 6px;
     box-shadow: 0 3px 10px rgba(0,0,0,0.05);
   }
-  .yildizlar { font-size: 20px; letter-spacing: 2px; }
+  .ust-senkron-btn.degisti {
+    background: var(--green); color: #fff; border-color: var(--green);
+    box-shadow: 0 4px 14px rgba(43, 182, 115, 0.35);
+  }
+  .ust-senkron-btn:disabled { opacity: 0.6; cursor: wait; }
+
+  .kaydet-cubuk {
+    position: fixed; bottom: 16px; left: 50%; transform: translateX(-50%);
+    width: calc(100% - 32px); max-width: 720px; z-index: 999;
+    background: #1F4E8C; color: #fff; padding: 12px 16px;
+    border-radius: 20px; display: flex; align-items: center; justify-content: space-between;
+    gap: 12px; box-shadow: 0 10px 28px rgba(0,0,0,0.25);
+  }
+  .kaydet-cubuk span { font-weight: 800; font-size: 15px; }
+  .kaydet-cubuk button {
+    background: var(--green); color: #fff; border: none;
+    padding: 12px 20px; border-radius: 14px; font-family: inherit;
+    font-weight: 900; font-size: 16px; cursor: pointer; flex-shrink: 0;
+  }
+  .kaydet-cubuk button:disabled { opacity: 0.6; }
 
   .sekmeler {
     display: grid; grid-template-columns: repeat(3, 1fr);
@@ -145,9 +163,9 @@
     display: flex; flex-direction: column; gap: 5px; flex-shrink: 0;
   }
   .sira-btn {
-    width: 42px; height: 30px; border-radius: 10px;
+    width: 44px; height: 32px; border-radius: 10px;
     border: 2px solid #E2D5C5; background: #FFF8F0;
-    color: var(--ink); font-size: 14px; font-weight: 900;
+    color: var(--ink); font-size: 15px; font-weight: 900;
     cursor: pointer; display: flex; align-items: center; justify-content: center;
     padding: 0;
   }
@@ -161,7 +179,7 @@
     display: flex; align-items: center; justify-content: center;
     flex-shrink: 0; color: #fff;
   }
-  .isaret.aktif { background: #2BB673; border-color: #2BB673; }
+  .isaret.aktif { background: var(--green); border-color: var(--green); }
   .isaret:disabled { cursor: not-allowed; opacity: 0.45; }
 
   .hafta-izgara {
@@ -231,13 +249,12 @@
 <div class="wrap">
   <header class="ust">
     <div class="selam">
-      <h1>Merhaba İpek! 🌸 <span class="surum-etiket">v2.0</span></h1>
+      <h1>Merhaba İpek! 🌸</h1>
       <p id="seciliTarihMetin">Yükleniyor…</p>
     </div>
-    <div class="yildiz-kutu" title="Bugün tamamlanan görevler">
-      <span class="yildizlar" id="yildizMetin">☆☆☆☆☆</span>
-      <span id="yildizSayac">0/0</span>
-    </div>
+    <button type="button" class="ust-senkron-btn" id="ustGuncelleBtn" onclick="degisiklikleriKaydet()">
+      🔄 Planı ve Takvimi Güncelle
+    </button>
   </header>
 
   <nav class="sekmeler" role="tablist">
@@ -310,6 +327,12 @@
   </section>
 </div>
 
+<!-- DEĞİŞİKLİK YAPILDIĞINDA ÇIKAN SABİT KAYDET ÇUBUĞU -->
+<div class="kaydet-cubuk gizli" id="altKaydetCubuk">
+  <span id="degisiklikMetin">Değişiklikler hazır!</span>
+  <button type="button" id="altKaydetBtn" onclick="degisiklikleriKaydet()">✅ Kaydet ve Takvimi Güncelle</button>
+</div>
+
 <script>
   var APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzYIdXXb_XjCconapEvrnSib1YVbHVzv1ctgOFanFmuQ_rzWKQjI_52ZD8KwgOjQ-0/exec";
 
@@ -324,7 +347,10 @@
     isaretlemeSaati: '18:00',
     seciliGun: null,
     gunler: [],
-    islemSuruyor: false
+    kaydediliyor: false,
+    degisiklikVar: false,
+    bekleyenIsaretler: {},
+    bekleyenSiralamalar: {}
   };
 
   var TUR_BILGI = {
@@ -390,12 +416,44 @@
     DURUM.isaretlemeSaati = veri.isaretlemeSaati || '18:00';
     DURUM.gunler = veri.gunler || [];
     DURUM.seciliGun = hedefGun || DURUM.seciliGun || veri.bugun;
+    DURUM.degisiklikVar = false;
+    DURUM.bekleyenIsaretler = {};
+    DURUM.bekleyenSiralamalar = {};
     document.getElementById('oyunTarih').value = DURUM.seciliGun;
     document.getElementById('tatilTarih').value = DURUM.seciliGun;
     ciz();
   }
 
+  function kaydetButonlariniGuncelle() {
+    var ustBtn = document.getElementById('ustGuncelleBtn');
+    var altCubuk = document.getElementById('altKaydetCubuk');
+    var altBtn = document.getElementById('altKaydetBtn');
+
+    if (DURUM.kaydediliyor) {
+      ustBtn.disabled = true;
+      ustBtn.textContent = '⏳ Takvim Güncelleniyor…';
+      altBtn.disabled = true;
+      altBtn.textContent = '⏳ Kaydediliyor…';
+      return;
+    }
+
+    ustBtn.disabled = false;
+    altBtn.disabled = false;
+    altBtn.textContent = '✅ Kaydet ve Takvimi Güncelle';
+
+    if (DURUM.degisiklikVar) {
+      ustBtn.classList.add('degisti');
+      ustBtn.textContent = '✅ Değişiklikleri Kaydet ve Güncelle';
+      altCubuk.classList.remove('gizli');
+    } else {
+      ustBtn.classList.remove('degisti');
+      ustBtn.textContent = '🔄 Planı ve Takvimi Güncelle';
+      altCubuk.classList.add('gizli');
+    }
+  }
+
   function ciz() {
+    kaydetButonlariniGuncelle();
     if (!DURUM.gunler.length) return;
     var secili = DURUM.gunler.find(function (g) { return g.dateKey === DURUM.seciliGun; }) || DURUM.gunler[0];
     DURUM.seciliGun = secili.dateKey;
@@ -434,20 +492,11 @@
 
     var acik = isaretlemeAcikMi(secili.dateKey);
     var kilitNot = document.getElementById('kilitNot');
-    if (secili.dateKey > DURUM.bugun) {
-      kilitNot.textContent = '▲▼ Ok tuşlarıyla ödev sırasını değiştirebilirsin. İşaretleme günü geldiğinde açılır.';
-    } else if (!acik) {
-      kilitNot.textContent = '▲▼ Oklarla sırayı değiştirebilirsin. İşaretleme saat ' + DURUM.isaretlemeSaati + '’den sonra açılır.';
+    if (DURUM.degisiklikVar) {
+      kilitNot.textContent = '💡 Sıralamayı veya yapılanları değiştirdin! İşin bitince "Kaydet ve Takvimi Güncelle" tuşuna bas.';
     } else {
-      kilitNot.textContent = '✅ Yaptıklarını işaretle veya ▲▼ oklarla sırasını değiştir; Google Takvim anında güncellenir!';
+      kilitNot.textContent = '🔼🔽 Oklarla istediğin kadar sıra değiştir veya ✓ işaretle, sonra "Güncelle" tuşuna bas.';
     }
-
-    var sayilabilir = secili.bloklar.filter(function (b) { return b.tur !== 'uyku'; });
-    var tamamSay = sayilabilir.filter(function (b) { return b.yapildi; }).length;
-    var toplam = sayilabilir.length;
-    var yildizSayisi = toplam ? Math.round((tamamSay / toplam) * 5) : 0;
-    document.getElementById('yildizMetin').textContent = '★'.repeat(yildizSayisi) + '☆'.repeat(5 - yildizSayisi);
-    document.getElementById('yildizSayac').textContent = tamamSay + '/' + toplam;
 
     var siralanabilirler = secili.bloklar.filter(blokSiralanabilirMi);
 
@@ -457,16 +506,16 @@
       var kartSinif = 'kart tur-' + b.tur + (simdiMi ? ' simdi' : '') + (b.yapildi ? ' tamam' : '');
       var otomatikEtiket = b.otomatik ? '<span class="etiket">Akıllı plan</span>' : '<span class="etiket">' + tb.etiket + '</span>';
       var dugmeSinif = 'isaret' + (b.yapildi ? ' aktif' : '');
-      var kilitli = (!acik || b.tur === 'uyku' || DURUM.islemSuruyor) ? ' disabled' : '';
+      var kilitli = (!acik || b.tur === 'uyku' || DURUM.kaydediliyor) ? ' disabled' : '';
       var idKod = encodeURIComponent(b.id);
       var baslikKod = encodeURIComponent(b.title);
-      var saatMetni = (b.start === '✓') ? '✓ Tamamlandı' : (b.start + ' – ' + b.end);
+      var saatMetni = (b.yapildi || b.start === '✓') ? '✓ Tamamlandı' : (b.start + ' – ' + b.end);
 
       var siraButonlariHtml = '';
       if (blokSiralanabilirMi(b)) {
         var sIdx = siralanabilirler.indexOf(b);
-        var ilkMi = (sIdx <= 0) || DURUM.islemSuruyor;
-        var sonMu = (sIdx === -1 || sIdx >= siralanabilirler.length - 1) || DURUM.islemSuruyor;
+        var ilkMi = (sIdx <= 0) || DURUM.kaydediliyor;
+        var sonMu = (sIdx === -1 || sIdx >= siralanabilirler.length - 1) || DURUM.kaydediliyor;
         siraButonlariHtml = '<div class="sira-kutu">' +
           '<button type="button" class="sira-btn" title="Üste taşı" ' + (ilkMi ? 'disabled' : '') +
             ' onclick="gorevTasi(\'' + baslikKod + '\', \'' + secili.dateKey + '\', \'yukari\')">▲</button>' +
@@ -494,7 +543,7 @@
       var d = tarihParcala(g.dateKey);
       var bugunSinif = g.dateKey === DURUM.bugun ? ' bugun' : '';
       var miniHtml = g.bloklar.map(function (b) {
-        var mSaat = (b.start === '✓') ? '✓ Bitti' : (b.start + '–' + b.end + (b.yapildi ? ' ✓' : ''));
+        var mSaat = (b.yapildi || b.start === '✓') ? '✓ Bitti' : (b.start + '–' + b.end);
         return '<div class="mini tur-' + b.tur + '" style="background:var(--' + b.tur + ');color:var(--' + b.tur + '-ink)">' +
           '<span class="m-saat">' + mSaat + '</span>' +
           escapeHtml(b.title) + '</div>';
@@ -539,7 +588,7 @@
       url.searchParams.set('api', 'hafta');
       url.searchParams.set('k', argumanlar[0] || ANAHTAR);
       if (argumanlar[1]) url.searchParams.set('baslangic', argumanlar[1]);
-      url.searchParams.set('_t', Date.now()); // Önbelleği (cache) devre dışı bırak
+      url.searchParams.set('_t', Date.now());
 
       fetch(url.toString(), {
         method: 'GET',
@@ -556,14 +605,10 @@
     }
 
     var payload = { islem: metot, anahtar: argumanlar[0] || ANAHTAR };
-    if (metot === 'isaretle') {
-      payload.id = argumanlar[1];
-      payload.tarih = argumanlar[2];
-      payload.yapildi = argumanlar[3];
-    } else if (metot === 'siraDegistir') {
+    if (metot === 'topluGuncelle') {
       payload.tarih = argumanlar[1];
-      payload.baslik = argumanlar[2];
-      payload.yon = argumanlar[3];
+      payload.siralama = argumanlar[2];
+      payload.isaretler = argumanlar[3];
     } else if (metot === 'oyunEkle') {
       payload.tarih = argumanlar[1];
       payload.baslik = argumanlar[2];
@@ -589,71 +634,84 @@
     .catch(hataYakalayici);
   }
 
+  /**
+   * ▲ / ▼ tuşuna basıldığında sunucuyu beklemeden ANINDA ekranda yer değiştirir.
+   * Kullanıcı birkaç değişiklik yaptıktan sonra "Kaydet ve Takvimi Güncelle" tuşuna basar.
+   */
   function gorevTasi(baslikKod, dateKey, yon) {
     var baslik = decodeURIComponent(baslikKod);
     var gun = DURUM.gunler.find(function (g) { return g.dateKey === dateKey; });
-    if (gun && gun.bloklar) {
-      // Ekranda anında yer değiştir (Optimistic UI)
-      var siralanabilirIndexler = [];
-      gun.bloklar.forEach(function (b, idx) {
-        if (blokSiralanabilirMi(b)) siralanabilirIndexler.push(idx);
-      });
-      var mevcutSiraliPos = siralanabilirIndexler.findIndex(function (blokIdx) {
-        return gun.bloklar[blokIdx].title === baslik;
-      });
-      var hedefSiraliPos = (yon === 'yukari') ? mevcutSiraliPos - 1 : mevcutSiraliPos + 1;
-      if (mevcutSiraliPos !== -1 && hedefSiraliPos >= 0 && hedefSiraliPos < siralanabilirIndexler.length) {
-        var idx1 = siralanabilirIndexler[mevcutSiraliPos];
-        var idx2 = siralanabilirIndexler[hedefSiraliPos];
-        // Saatleri sabit tutup başlık, id ve türleri takas et ki anında görünsün
-        var b1 = gun.bloklar[idx1];
-        var b2 = gun.bloklar[idx2];
-        var gecici = { id: b1.id, title: b1.title, tur: b1.tur };
-        b1.id = b2.id; b1.title = b2.title; b1.tur = b2.tur;
-        b2.id = gecici.id; b2.title = gecici.title; b2.tur = gecici.tur;
-      }
-    }
+    if (!gun || !gun.bloklar) return;
 
-    DURUM.islemSuruyor = true;
-    ciz();
-
-    sunucuCagir('siraDegistir', [ANAHTAR, dateKey, baslik, yon], function (yeniVeri) {
-      DURUM.islemSuruyor = false;
-      if (yeniVeri && yeniVeri.gunler) {
-        veriUygula(yeniVeri, dateKey);
-      } else {
-        verileriYukle(dateKey);
-      }
-    }, function (err) {
-      DURUM.islemSuruyor = false;
-      verileriYukle(dateKey);
-      alert('Sıralama kaydedilirken hata oluştu (Apps Script Yeni Sürüm dağıtımını kontrol edin): ' + (err && err.message ? err.message : err));
+    var siralanabilirIndexler = [];
+    gun.bloklar.forEach(function (b, idx) {
+      if (blokSiralanabilirMi(b)) siralanabilirIndexler.push(idx);
     });
+
+    var mevcutPos = siralanabilirIndexler.findIndex(function (blokIdx) {
+      return gun.bloklar[blokIdx].title === baslik;
+    });
+    var hedefPos = (yon === 'yukari') ? mevcutPos - 1 : mevcutPos + 1;
+    if (mevcutPos === -1 || hedefPos < 0 || hedefPos >= siralanabilirIndexler.length) return;
+
+    var idx1 = siralanabilirIndexler[mevcutPos];
+    var idx2 = siralanabilirIndexler[hedefPos];
+    var b1 = gun.bloklar[idx1];
+    var b2 = gun.bloklar[idx2];
+
+    var gecici = { id: b1.id, title: b1.title, tur: b1.tur, sureDk: b1.sureDk };
+    b1.id = b2.id; b1.title = b2.title; b1.tur = b2.tur; b1.sureDk = b2.sureDk;
+    b2.id = gecici.id; b2.title = gecici.title; b2.tur = gecici.tur; b2.sureDk = gecici.sureDk;
+
+    // Yeni sıralamayı hafızaya kaydet
+    DURUM.bekleyenSiralamalar[dateKey] = gun.bloklar
+      .filter(blokSiralanabilirMi)
+      .map(function (b) { return b.title; });
+
+    DURUM.degisiklikVar = true;
+    ciz();
   }
 
+  /**
+   * ✓ tuşuna basıldığında sunucuyu beklemeden ANINDA işaretler.
+   */
   function gorevTikla(idKod, dateKey) {
     var id = decodeURIComponent(idKod);
     var gun = DURUM.gunler.find(function (g) { return g.dateKey === dateKey; });
     if (!gun) return;
     var blok = gun.bloklar.find(function (b) { return b.id === id; });
     if (!blok) return;
-    var yeniDurum = !blok.yapildi;
-    blok.yapildi = yeniDurum;
-    DURUM.islemSuruyor = true;
+
+    blok.yapildi = !blok.yapildi;
+    DURUM.bekleyenIsaretler[id] = blok.yapildi;
+    DURUM.degisiklikVar = true;
+    ciz();
+  }
+
+  /**
+   * "Kaydet ve Takvimi Güncelle" tuşuna basıldığında tüm sıralama ve işaretleri
+   * tek seferde sunucuya gönderir, saatleri yeniden hesaplar ve Google Takvim'e yazar!
+   */
+  function degisiklikleriKaydet() {
+    var aktifGun = DURUM.seciliGun || DURUM.bugun;
+    var gunObj = DURUM.gunler.find(function (g) { return g.dateKey === aktifGun; });
+    var guncelSira = DURUM.bekleyenSiralamalar[aktifGun] ||
+      (gunObj ? gunObj.bloklar.filter(blokSiralanabilirMi).map(function (b) { return b.title; }) : []);
+
+    DURUM.kaydediliyor = true;
     ciz();
 
-    sunucuCagir('isaretle', [ANAHTAR, id, dateKey, yeniDurum], function (yeniVeri) {
-      DURUM.islemSuruyor = false;
+    sunucuCagir('topluGuncelle', [ANAHTAR, aktifGun, guncelSira, DURUM.bekleyenIsaretler], function (yeniVeri) {
+      DURUM.kaydediliyor = false;
       if (yeniVeri && yeniVeri.gunler) {
-        veriUygula(yeniVeri, dateKey);
+        veriUygula(yeniVeri, aktifGun);
       } else {
-        verileriYukle(dateKey);
+        verileriYukle(aktifGun);
       }
     }, function (err) {
-      DURUM.islemSuruyor = false;
-      blok.yapildi = !yeniDurum;
+      DURUM.kaydediliyor = false;
       ciz();
-      alert('İşaret kaydedilemedi: ' + (err && err.message ? err.message : err));
+      alert('Güncelleme sırasında hata oluştu: ' + (err && err.message ? err.message : err));
     });
   }
 
@@ -679,7 +737,7 @@
     sunucuCagir('oyunEkle', [ANAHTAR, tarih, baslik, bas, bit], function (yeniVeri) {
       btn.disabled = false;
       document.getElementById('oyunBaslik').value = '';
-      mesajGoster('oyunMesaj', 'Harika! Programa eklendi 🎉', true);
+      mesajGoster('oyunMesaj', 'Harika! Programa ve Takvime eklendi 🎉', true);
       if (yeniVeri && yeniVeri.gunler) veriUygula(yeniVeri, tarih);
       else verileriYukle(tarih);
     }, function (err) {
@@ -714,7 +772,13 @@
     });
   }
 
-  setInterval(function () { verileriYukle(DURUM.seciliGun); }, 5 * 60 * 1000);
+  // Eğer kaydedilmemiş değişiklik varsa otomatik yenileme yapıp kullanıcının sırasını bozma!
+  setInterval(function () {
+    if (!DURUM.degisiklikVar && !DURUM.kaydediliyor) {
+      verileriYukle(DURUM.seciliGun);
+    }
+  }, 5 * 60 * 1000);
+
   verileriYukle();
 </script>
 </body>
