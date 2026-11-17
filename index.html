@@ -178,6 +178,13 @@
   .tur-uyku  .ikon, .tur-uyku  .etiket { background: var(--uyku);  color: var(--uyku-ink); }
   .tur-diger .ikon, .tur-diger .etiket { background: var(--diger); color: var(--diger-ink); }
 
+  /* Önceki günlerden taşınan ödev etiketi */
+  .etiket.gecikme, .tur-odev .etiket.gecikme, .tur-test .etiket.gecikme, .tur-okuma .etiket.gecikme {
+    background: #FDE2E1; color: #9B1C1C;
+  }
+  .kart.gecikmis { box-shadow: inset 4px 0 0 #E5484D; }
+  .mini .m-gecikme { display: block; font-size: 10px; font-weight: 800; color: #9B1C1C; }
+
   .sira-kutu {
     display: flex; flex-direction: column; gap: 5px; flex-shrink: 0;
   }
@@ -393,6 +400,14 @@
   };
 
   var GUN_KISA = ['Paz', 'Pzt', 'Sal', 'Çar', 'Per', 'Cum', 'Cmt'];
+  // "Pazartesi'den kaldı" gibi ekli gün adları (Pazar = 0)
+  var GUN_DEN = ["Pazar'dan", "Pazartesi'den", "Salı'dan", "Çarşamba'dan", "Perşembe'den", "Cuma'dan", "Cumartesi'den"];
+  function gecikmeMetni(dateKey) {
+    if (!dateKey) return '';
+    var p = String(dateKey).split('-').map(Number);
+    var d = new Date(p[0], p[1] - 1, p[2]);
+    return '⏳ ' + GUN_DEN[d.getDay()] + ' kaldı';
+  }
   var GUN_UZUN = ['Pazar', 'Pazartesi', 'Salı', 'Çarşamba', 'Perşembe', 'Cuma', 'Cumartesi'];
   var AYLAR = ['Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran', 'Temmuz', 'Ağustos', 'Eylül', 'Ekim', 'Kasım', 'Aralık'];
 
@@ -720,8 +735,11 @@
     var listeHtml = secili.bloklar.map(function (b) {
       var tb = TUR_BILGI[b.tur] || TUR_BILGI.diger;
       var simdiMi = (secili.dateKey === DURUM.bugun) && !b.yapildi && (DURUM.simdiSaat >= b.start && DURUM.simdiSaat < b.end);
-      var kartSinif = 'kart tur-' + b.tur + (simdiMi ? ' simdi' : '') + (b.yapildi ? ' tamam' : '');
+      var kartSinif = 'kart tur-' + b.tur + (simdiMi ? ' simdi' : '') + (b.yapildi ? ' tamam' : '') + (b.gecikmis && !b.yapildi ? ' gecikmis' : '');
       var otomatikEtiket = b.otomatik ? '<span class="etiket">Akıllı plan</span>' : '<span class="etiket">' + tb.etiket + '</span>';
+      if (b.gecikmis && !b.yapildi) {
+        otomatikEtiket += '<span class="etiket gecikme">' + gecikmeMetni(b.gecikmis) + '</span>';
+      }
       var dugmeSinif = 'isaret' + (b.yapildi ? ' aktif' : '');
       var kilitli = (!acik || b.tur === 'uyku' || DURUM.kaydediliyor) ? ' disabled' : '';
       var idKod = encodeURIComponent(b.id);
@@ -763,6 +781,7 @@
         var mSaat = (b.yapildi || b.start === '✓') ? '✓ Bitti' : (b.start + '–' + b.end);
         return '<div class="mini tur-' + b.tur + '" style="background:var(--' + b.tur + ');color:var(--' + b.tur + '-ink)">' +
           '<span class="m-saat">' + mSaat + '</span>' +
+          (b.gecikmis && !b.yapildi ? '<span class="m-gecikme">' + gecikmeMetni(b.gecikmis) + '</span>' : '') +
           escapeHtml(b.title) + '</div>';
       }).join('');
       return '<div class="gun-sutun' + bugunSinif + '" onclick="haftadanGuneGit(\'' + g.dateKey + '\')">' +
